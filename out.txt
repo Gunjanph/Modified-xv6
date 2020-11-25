@@ -1,0 +1,193 @@
+293a294
+> 
+299c300
+< 
+---
+>     
+363,364c364
+<         // Added time field update, else same from wait system call   
+<         // *wtime = p->etime - p->stime - p->rtime - p->iotime;
+---
+>         // Added time field update, else same from wait system call
+375d374
+<         p->parent = 0;
+376a376
+>         p->parent = 0;
+393,433d392
+< int   
+< getpinfo(struct proc_stat * prInfo, int pid)   
+< {
+<   int flag = 0;
+<   struct proc *p;
+<   if(pid==0)
+<     p=myproc();
+<   else
+<   {
+<     acquire(&ptable.lock);
+<     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){   
+<       if(pid==p->pid)
+<       {
+<         flag = 1;
+<         break;
+<       }
+<     }
+<     release(&ptable.lock);
+< 
+<     if(!flag)
+<     {
+<       cprintf("Invalid pid.\n");
+<       return 0;
+<     }
+<   }
+< 
+<   prInfo->pid = p->pid;
+<   prInfo->runtime = p->rtime;
+<   prInfo->num_run = p->numrun;
+<   prInfo->current_queue = p->current_queue;
+<   #ifdef MLFQ
+<     prInfo->current_queue = p->current_queue = p->priority;
+<   #else
+<     prInfo->current_queue = p->current_queue;
+<   #endif
+< 
+<   for(int i=0; i<5; i++)
+<     prInfo->ticks[i] = p->ticks[i];
+<   return 1;
+< }
+< 
+445,531c404,434
+<   struct proc *p = 0;   
+<   struct cpu *c = mycpu();    
+<   c->proc = 0;    
+<   for(;;)   
+<   {   
+<       // Enable interrupts on this processor.   
+<       sti();    
+<       // Loop over process table looking for process to run.    
+<       struct proc *leastP = 0;
+<       // int mlfqflag = 0;    
+<       acquire(&ptable.lock);    
+<       for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)    
+<       {   
+<           #ifdef DEFAULT    
+<               if(p->state != RUNNABLE)
+<                 continue;   
+<           #else   
+<           #ifdef PBS   
+<               struct proc *maxP = 0;   
+<               if(p->state != RUNNABLE)    
+<                 continue;   
+<               maxP = p;    
+<               for(struct proc *p1 = ptable.proc; p1 < &ptable.proc[NPROC]; p1++){    
+<                 if((p1->state == RUNNABLE) && (p1->priority < maxP->priority))   
+<                   maxP = p1;
+<               }   
+<               if(maxP != 0)    
+<                 p = maxP;
+<           #else   
+<           #ifdef FCFS   
+<             if(p->state != RUNNABLE)    
+<               continue;
+<             if(p->pid > 1)    
+<             {
+<               if(leastP != 0){   
+<                   if((p->stime < leastP->stime) || (p->name[0]=='p' && p->name[1]=='s'))
+<                   {
+<                     // cprintf("Process %s selected.\n", p->name);
+<                     leastP = p;
+<                   }  
+<               }   
+<               else
+<                   leastP = p;
+<             }   
+<             if(leastP != 0 && leastP->state == RUNNABLE)    
+<                 p = leastP;  
+<           #else   
+<           #ifdef MLFQ
+<             struct proc *foundP = 0;    
+<             uint priority = 0;    
+<             int index1 = 0;   
+<             int index2 = 0;   
+<             int index3 = 0;   
+<             int index4 = 0;   
+<             int index5 = 0;
+<             foundP = bestProcess(&index1, &index2, &index3, &index4, &index5, &priority);
+<             // mlfqflag = 1;
+<             if (foundP != 0)
+<             {
+<               p = foundP;
+<             }   
+<             else{   
+<               if(p->state != RUNNABLE)
+<                 continue;  
+<             }
+<           #endif    
+<           #endif    
+<           #endif    
+<           #endif    
+<           if(p != 0)    
+<           { 
+<             c->proc = p;    
+<             switchuvm(p);   
+<             p->state = RUNNING;   
+<             p->numrun++;
+<             #ifdef MLFQ
+<               p->tickcounter = 0;
+<             #endif
+<             swtch(&(c->scheduler), p->context);   
+<             switchkvm();
+<             c->proc = 0;
+<           }
+<           // if(mlfqflag==1)
+<           //   break;
+<       }   
+<       release(&ptable.lock);    
+<   }   
+---
+>   struct proc *p;
+>   struct cpu *c = mycpu();
+>   c->proc = 0;
+>   
+>   for(;;){
+>     // Enable interrupts on this processor.
+>     sti();
+> 
+>     // Loop over process table looking for process to run.
+>     acquire(&ptable.lock);
+>     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+>       if(p->state != RUNNABLE)
+>         continue;
+> 
+>       // Switch to chosen process.  It is the process's job
+>       // to release ptable.lock and then reacquire it
+>       // before jumping back to us.
+>       c->proc = p;
+>       switchuvm(p);
+>       p->state = RUNNING;
+> 
+>       swtch(&(c->scheduler), p->context);
+>       switchkvm();
+> 
+>       // Process is done running for now.
+>       // It should have changed its p->state before coming back.
+>       c->proc = 0;
+>     }
+>     release(&ptable.lock);
+> 
+>   }
+712,716d614
+<       
+< struct proc *getptable_proc(void) {   
+<   return ptable.proc;   
+< }   
+< // Change Process priority  
+863c761,766
+< }
+\ No newline at end of file
+---
+> }
+> 
+> struct proc *getptable_proc(void) {   
+>   return ptable.proc;   
+> }
+> 
