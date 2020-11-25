@@ -1,4 +1,5 @@
 # Modified-xv6
+To run the code in xv6, check run.md
 ## Task 1
 
 ### waitx() syscall:
